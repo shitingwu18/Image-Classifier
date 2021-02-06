@@ -20,27 +20,31 @@ from torch.utils.data import DataLoader
 from collections import OrderedDict
 
 
-parser = argparse.ArgumentParser(description = 'add argument to train model')
-# Argument : Data directory
-parser.add_argument('--data_directory', type = str, ### default = './flowers',
+def init_argparse():
+    parser = argparse.ArgumentParser(description = 'add argument to train model')
+    # Argument : Data directory
+    parser.add_argument('data_dir', action = 'store', type = str, ### default = './flowers',
                     help = 'data directory of the model')
-# Argument : Set directory to save checkpoints
-parser.add_argument('--save_dir', type = str, default = './checkpoint.pth', 
-                    help = 'path to save checkpoint') 
-# Argument : Choose architecture
-### ?????????
-parser.add_argument('--arch', type = str, default = 'vgg13')
-# Argument : Set hyperparameters
-parser.add_argument('--learning_rate', type = float, default = 0.003)
-parser.add_argument('--hidden_units', type = int, default = 1024)
-parser.add_argument('--epochs', type = int, default = 45)
-# Argument : User GPU for training
-parser.add_argument('--gpu', type = bool, default = True)
+    ### # Argument : Choose architecture
+    parser.add_argument('--arch', action = 'store', dest = 'arch', type = str, default = 'vgg16_bn')
+    # Argument : Set directory to save checkpoints
 
+    parser.add_argument('--save_dir', action = 'store',dest = 'save_dir', type = str, default = './checkpoint.pth',
+                        help = 'path to save checkpoint')
+    # Argument : Set hyperparameters
+    parser.add_argument('--learning_rate', action = 'store',dest = 'learning_rate', type = float, default = 0.003)
+    parser.add_argument('--hidden_units', action = 'append',dest = 'hidden_units', type = int, default = 1024)
+    parser.add_argument('--epochs', action = 'store', dest = 'epochs', type = int, default = 45)
+    # Argument : User GPU for training
+    parser.add_argument('--gpu',action = 'store_true', dest = 'gpu', default = True)
+    parser.add_argument('--barch_size', action = 'store', dest = 'batch_size', default = 64)
+    args = parser.parse_args()
+
+    return args
     ### Assign variable in_args to parse_args()
-    
-def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu):
-    
+
+def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, batch_size, arch):
+
     train_dir = data_dir + '/train'
     valid_dir = data_dir + '/valid'
     test_dir = data_dir + '/test'
@@ -70,14 +74,15 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu):
 
 
     # TODO: Using the image datasets and the trainforms, define the dataloaders
-    trainloaders = DataLoader(train_datasets,batch_size=64,shuffle=True)
-    validloaders = DataLoader(valid_datasets, batch_size = 64, shuffle = True)
-    testloaders = DataLoader(test_datasets, batch_size = 64, shuffle = True)
+    trainloaders = DataLoader(train_datasets,batch_size=batch_size,shuffle=True)
+    validloaders = DataLoader(valid_datasets, batch_size = batch_size, shuffle = True)
+    testloaders = DataLoader(test_datasets, batch_size = batch_size, shuffle = True)
 
 
     ### Define model
     # TODO: Build and train your network
-    vgg = models.vgg16_bn(pretrained=True)
+    # vgg = models.vgg16_bn(pretrained=True)
+    vgg = getattr(models, arch)(pretrained = True)
     ### froze parameter
     for param in vgg.parameters():
         param.requires_grad = False
@@ -111,13 +116,13 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu):
         running_loss = 0
         accuracy = 0
         for images, labels in trainloaders:
-            
+
             images, labels = images.to(device), labels.to(device)
 
             iteration += 1
             print('data to device')
             optimizer.zero_grad()
-            
+
             log_ps = vgg.forward(images)
             print('finish feed forwrad')
             loss = criterion(log_ps, labels)
@@ -132,7 +137,7 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu):
             equals = top_class == labels.view(*top_class.shape)
             accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
 
-        vgg.eval()    
+        vgg.eval()
         with torch.no_grad():
             print('start validation')
             valid_running_loss = 0
@@ -148,16 +153,16 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu):
                 #         print(top_class)
                 valid_equals = valid_top_class == valid_labels.view(*valid_top_class.shape)
                 valid_accuracy += torch.mean(valid_equals.type(torch.FloatTensor)).item()
-        vgg.train()          
+        vgg.train()
 
         print('epoch: ', i + 1)
         print('train loss of this epoch: ', running_loss/len(trainloaders))
         print('accuracy of the epoch: ', accuracy/len(trainloaders))
         print('valid loss of this epoch: ', valid_running_loss/len(validloaders))
-        print('accuracy of the valid set: ', valid_accuracy/len(validloaders))  
+        print('accuracy of the valid set: ', valid_accuracy/len(validloaders))
 
 
-    # # TODO: Save the checkpoint 
+    # # TODO: Save the checkpoint
     vgg.class_to_idx = train_datasets.class_to_idx
     # # vgg
 
@@ -170,26 +175,26 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu):
                     ,'optimizer_state_dict' : optimizer.state_dict()
                     }
     torch.save(checkpoint, save_dir)
-    
+
     return checkpoint
 
 def main():
     start_time = time.time()
     ### input argument
-    in_args = parser.parse_args()
+    in_args = init_argparse()
     print(in_args)
-    
-    train_model(in_args.data_directory, in_args.save_dir, in_args.learning_rate, in_args.hidden_units, in_args.epochs, in_args.gpu)
+
+    train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, batch_size, arch)
         # TODO 0: Measure total program runtime by collecting end time
     end_time = time.time()
-    
+
     # TODO 0: Computes overall runtime in seconds & prints it in hh:mm:ss format
     tot_time = end_time - start_time #calculate difference between end time and start time
     print("\n** Total Elapsed Runtime:",
           str(int((tot_time/3600)))+":"+str(int((tot_time%3600)/60))+":"
           +str(int((tot_time%3600)%60)) )
-    
-    
+
+
 # Call to main function to run the program
 if __name__ == "__main__":
     main()
