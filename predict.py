@@ -41,17 +41,38 @@ with open(category_names, 'r') as f:
 
 device = torch.device('cuda' if (torch.cuda.is_available() == True) & (in_args.gpu == True) else 'cpu' )
 
-# TODO: Write a function that loads a checkpoint and rebuilds the model
-def load_checkpoint(filepath, arch):
-    checkpoint = torch.load(filepath)
-    ### initialize model and optimizer
-    model = getattr(models, arch)(pretrained = True)
-    model.classifier = checkpoint['classifier']
-    model.load_state_dict(checkpoint['state_dict'])
+# # TODO: Write a function that loads a checkpoint and rebuilds the model
+# def load_checkpoint(filepath, arch):
+#     checkpoint = torch.load(filepath)
+#     ### initialize model and optimizer
+#     model = getattr(models, arch)(pretrained = True)
+#     model.classifier = checkpoint['classifier']
+#     model.load_state_dict(checkpoint['state_dict'])
+#
+#     optimizer = optim.Adam(model.classifier.parameters(), lr = 0.003)
+#     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+#     epochs = checkpoint['epochs']
+#
+#     return model
 
-    optimizer = optim.Adam(model.classifier.parameters(), lr = 0.003)
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    epochs = checkpoint['epochs']
+def load_model(checkpoint):
+
+    t_models = {
+                'vgg19' : models.vgg19(pretrained = True),
+                'densenet121' : models.densenet121(pretrained = True),
+                'resnet101' : models.resnet101(pretrained = True)}
+
+    model = t_models.get(checkpoint['arch'], 'vgg19')
+
+    if checkpoint['arch'] == 'vgg19' or checkpoint['arch'] == 'densenet121':
+        model.classifer = checkpoint['classifier']
+        model.load_state_dict(checkpoint['state_dict'])
+        model.class_to_idx = checkpoint['class_to_idx']
+
+    else:
+        model.fc = checkpoint['fc']
+        model.load_state_dict(checkpoint['state_dict'])
+        model.class_to_idx = checkpoint['class_to_idx']
 
     return model
 
@@ -75,7 +96,7 @@ def predict(image_path, model, topk):
 
 # TODO: Display an image along with the top 5 classes
 # img_path = './flowers/train/43/image_02338.jpg'
-vgg = load_checkpoint(checkpoint)
+vgg = load_model(checkpoint)
 vgg.eval()
 
 top_p, top_class = predict(image_direction, vgg, topk)

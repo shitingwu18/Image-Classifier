@@ -18,6 +18,7 @@ from torch import nn
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from collections import OrderedDict
+import matplotlib.pyplot as plt
 
 
 def init_argparse():
@@ -40,8 +41,80 @@ def init_argparse():
     parser.add_argument('--barch_size', action = 'store', dest = 'batch_size', default = 64)
     args = parser.parse_args()
 
+    ### adding help message
+    if(args.arch == 'help'):
+        print('List of available CNN networks:')
+        print('1. vgg11')
+        print('2. vgg13')
+        print('3. vgg16')
+        print('4. vgg16_bn')
+        print('5. desenet121')
+        print('6. alexnet')
+        quit()
+
+    if(args.learning_rate > 1 or args.learning_rate < 0):
+        print('Error: Invalid learning rate')
+        print('Must be between 0 and 1 exclusive')
+        quit()
+
+    if(args.batch_size < 0):
+        print('Error: Invalid batch size')
+        print('Must be greater than 0')
+        quit()
+
+    if(args.hidden_units <= 0):
+        print('Error: Invalid number of hidden units given, Must be greater than 0')
+        quit()
+
+    arches = ['vgg11', 'vgg13', 'vgg16', 'vgg19', 'alexnet', 'densenet']
+    lossF = ['L1', 'NLL', 'Poisson', 'MSE', 'Cross']
+
+    if args.arch not in arches:
+        print('Error: Invalid architecture naume received')
+        print('Type \'python train.py -a help\' for more information')
+        quit()
+
+    if args.loss not in lossF:
+        print('Error: Invalid architecture name received')
+        print('type \'python train.py -l help\' for more information ')
+        quit()
+
+    if args.device not in ['cpu', 'gpu']:
+        print('Error: invalid device name received')
+        print('It must be either 'cpu' or 'gpu')
+        quit()
+
     return args
     ### Assign variable in_args to parse_args()
+
+def loaders(data_dir, batch_size, transform):
+
+    datasets = torchvision.datasets.ImageFolder(root = data_dir, transform = transform)
+    dataloaders = DataLoader(datasets, batch_size = batch_size, shuffle = True)
+
+    retrun dataloaders
+
+def create_checkpoint(model, path, model_name, class_to_idx, optimizer, epochs):
+    model.cpu()
+    model.class_to_idx = class_to_idx
+    checkpoint = {
+                    'arch' : model_name,
+                    'state_dict' : model.state_dict(),
+                    'class_to_idx' : model.class_to_idx,
+                    'epochs' : epochs,
+                    'optimizer_state_dict' : optimizer.state_dict
+    }
+    if model_name == 'resnet101':
+        checkpoint['fc'] = model.fc
+    else:
+        checkpoint['classifier'] = model.classifier
+    file = str()
+    if path != None:
+        file = path + '/' + model_name + '_checkpoint.pth'
+    else:
+        file = model_name + '_checkpoint.pth'
+    torch.save(checkpoint, file)
+    print('Model(%s) has been saved into Path(%s)' % (model_name,file))
 
 def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, batch_size, arch):
 
@@ -67,41 +140,73 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
                                                           ])
 
 
-    # TODO: Load the datasets with ImageFolder
-    train_datasets = torchvision.datasets.ImageFolder(root = train_dir, transform = train_transform)
-    valid_datasets = torchvision.datasets.ImageFolder(root = valid_dir, transform = test_transform)
-    test_datasets = torchvision.datasets.ImageFolder(root = test_dir, transform = test_transform)
-
-
     # TODO: Using the image datasets and the trainforms, define the dataloaders
-    trainloaders = DataLoader(train_datasets,batch_size=batch_size,shuffle=True)
-    validloaders = DataLoader(valid_datasets, batch_size = batch_size, shuffle = True)
-    testloaders = DataLoader(test_datasets, batch_size = batch_size, shuffle = True)
+    trainloaders = loaders(train_dir,batch_size=batch_size,transform = train_transform)
+    validloaders = loaders(valid_dir,batch_size=batch_size,transform = test_transform)
+    testloaders = loaders(test_dir,batch_size=batch_size,transform=test_transform)
 
 
-    ### Define model
-    # TODO: Build and train your network
-    # vgg = models.vgg16_bn(pretrained=True)
-    vgg = getattr(models, arch)(pretrained = True)
-    ### froze parameter
-    for param in vgg.parameters():
-        param.requires_grad = False
-    ### define classifier for model
-    classifier = nn.Sequential(OrderedDict(
-    [('fc1', nn.Linear(25088, 4096))
-    ,('relu1', nn.ReLU())
-    ,('dropout', nn.Dropout(0.2))
-    ,('fc2', nn.Linear(4096, 2056))
-    ,('relu2', nn.ReLU())
-    ,('fc3', nn.Linear(2056, hidden_units))
-    ,('relu3', nn.ReLU())
-    ,('fc4', nn.Linear(hidden_units, 102))
-    ,('output', nn.LogSoftmax(dim = 1))
-    ]
-    ))
-    vgg.classifier = classifier
+    # ### Define model
+    # # TODO: Build and train your network
+    # # vgg = models.vgg16_bn(pretrained=True)
+    # vgg = getattr(models, arch)(pretrained = True)
+    # ### froze parameter
+    # for param in vgg.parameters():
+    #     param.requires_grad = False
+    # ### define classifier for model
+    # classifier = nn.Sequential(OrderedDict(
+    # [('fc1', nn.Linear(25088, 4096))
+    # ,('relu1', nn.ReLU())
+    # ,('dropout', nn.Dropout(0.2))
+    # ,('fc2', nn.Linear(4096, 2056))
+    # ,('relu2', nn.ReLU())
+    # ,('fc3', nn.Linear(2056, hidden_units))
+    # ,('relu3', nn.ReLU())
+    # ,('fc4', nn.Linear(hidden_units, 102))
+    # ,('output', nn.LogSoftmax(dim = 1))
+    # ]
+    # ))
+    # vgg.classifier = classifier
+    # optimizer = optim.Adam(vgg.classifier.parameters(), lr = learning_rate)
 
-    optimizer = optim.Adam(vgg.classifier.parameters(), lr = learning_rate)
+    t_models = {
+                'vgg19': models.vgg19(pretrained = True),
+                'densenet121': models.densenet121(pretrained = True),
+                'resnet101': models.resnet101(pretrained = True)
+    }
+
+    model = t_models.get(model_name, 'vgg19')
+    classifier = None
+    optimizer = None
+
+    if model_name == 'vgg19':
+        classifier = nn.Sequential(nn.Linear(25088, 4096),
+                                nn.ReLU(),
+                                nn.Dropoutput(0.4),
+                                nn.Linear(4096,102),
+                                nn.LogSoftmax(dim=1))
+        model.classifier = classifier
+        optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
+
+    if model_name == 'densenet121':
+        classifier = nn.Sequential(nn.Linear(1024, 1000),
+                                nn.ReLU(),
+                                nn.Dropoutput(0.4),
+                                nn.Linear(1000,102),
+                                nn.LogSoftmax(dim=1))
+        model.classifier = classifier
+        optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
+
+    if model_name == 'resnet101':
+        classifier = nn.Sequential(nn.Linear(2048, 1000),
+                                nn.ReLU(),
+                                nn.Dropoutput(0.4),
+                                nn.Linear(1000,102),
+                                nn.LogSoftmax(dim=1))
+        model.fc = classifier
+        optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
+
+
     criterion = nn.NLLLoss()
 
     device = torch.device("cuda" if (torch.cuda.is_available() == True) & (gpu == True) else "cpu")
@@ -112,6 +217,11 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
     iteration = 0
 
     print('start training')
+    train_loss = []
+    validation_loss = []
+    train_accuracy = []
+    validation_accuracy = []
+
     for i in range(epochs):
         running_loss = 0
         accuracy = 0
@@ -155,28 +265,37 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
                 valid_accuracy += torch.mean(valid_equals.type(torch.FloatTensor)).item()
         vgg.train()
 
+
         print('epoch: ', i + 1)
-        print('train loss of this epoch: ', running_loss/len(trainloaders))
-        print('accuracy of the epoch: ', accuracy/len(trainloaders))
-        print('valid loss of this epoch: ', valid_running_loss/len(validloaders))
-        print('accuracy of the valid set: ', valid_accuracy/len(validloaders))
+        train_loss.append(running_loss/len(trainloaders))
+        print('train loss of this epoch: ', train_loss[i])
+        train_accuracy.append(accuracy/len(trainloaders))
+        print('accuracy of the epoch: ', train_accuracy[i])
+        validation_loss.append(valid_running_loss/len(validloaders))
+        print('valid loss of this epoch: ', validation_loss[i])
+        validation_accuracy.append(valid_accuracy/len(validloaders))
+        print('accuracy of the valid set: ', validation_accuracy[i])
 
+        plt.figure(figsize = (10,6))
+        plt.plot(train_loss, label = 'Training')
+        plt.plot(validation_loss, label = 'Validation')
+        plt.legend()
+        plt.xlabel('epoch')
+        plt.ylabel('Loss')
+        plt.title('Training vs Validation Loss')
+        plt.show()
 
-    # # TODO: Save the checkpoint
-    vgg.class_to_idx = train_datasets.class_to_idx
-    # # vgg
+        plt.figure(figsize = (10,6))
+        plt.plot(train_accuracy, label = 'Training')
+        plt.plot(validation_accuracy, label = 'Validation')
+        plt.legend()
+        plt.xlabel('epoch')
+        plt.ylabel('Acurracy')
+        plt.title('Training vs Validation Accuracy')
+        plt.show()
 
-    checkpoint = {
+    create_checkpoint(vgg, save_dir, arch, train_datasets.class_to_idx, optimizer, epochs):
 
-                    'classifier' : vgg.classifier
-                    ,'epochs' : epochs
-                    ,'class_to_idx' : vgg.class_to_idx
-                    ,'state_dict' : vgg.state_dict()
-                    ,'optimizer_state_dict' : optimizer.state_dict()
-                    }
-    torch.save(checkpoint, save_dir)
-
-    return checkpoint
 
 def main():
     start_time = time.time()
