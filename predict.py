@@ -96,13 +96,29 @@ def predict(image_path, model, topk):
 
 # TODO: Display an image along with the top 5 classes
 # img_path = './flowers/train/43/image_02338.jpg'
-vgg = load_model(checkpoint)
-vgg.eval()
 
-top_p, top_class = predict(image_direction, vgg, topk)
-print('top class: ', [cat_to_name[str(i)] for i in top_class.tolist()[0]])
-print('top possibility: ', top_p.tolist()[0])
+def main():
+    start_time = time.time()
+    ### input argument
+    in_args = init_argparse()
+    print(in_args)
+    nn_model = load_model(checkpoint)
+    nn_model.eval()
 
+    top_p, top_class = predict(image_direction, nn_model, topk)
+    print('top class: ', [cat_to_name[str(i)] for i in top_class.tolist()[0]])
+    print('top possibility: ', top_p.tolist()[0])
+
+    end_time = time.time()
+
+    # TODO 0: Computes overall runtime in seconds & prints it in hh:mm:ss format
+    tot_time = end_time - start_time #calculate difference between end time and start time
+    print("\n** Total Elapsed Runtime:",
+          str(int((tot_time/3600)))+":"+str(int((tot_time%3600)/60))+":"
+          +str(int((tot_time%3600)%60)) )
 # plt.barh([cat_to_name[str(i)] for i in top_class.tolist()[0]], width = top_p.tolist()[0])
 # plt.show()
 # imshow(img_path)
+
+if __name__ = '__main__':
+    main()
