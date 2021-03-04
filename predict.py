@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from Load_Data import process_image, imshow
 import argparse
 import json
+import time
 
 
 def init_argparse():
@@ -23,9 +24,9 @@ def init_argparse():
                         help = 'input image file directory')
     ### # Argument : Choose architecture
     parser.add_argument('--arch', action = 'store', dest = 'arch', type = str, default = 'vgg16_bn')
-    parser.add_argument('--checkpoint',action ='store', dest = checkpoint, type = str,
+    parser.add_argument('--checkpoint',action ='store', dest = 'checkpoint', type = str,
                         help = 'pretrained model file')
-    parser.add_argument('--topk',action = 'store', dest = topk, type = int, default = 3,
+    parser.add_argument('--topk',action = 'store', dest = 'topk', type = int, default = 3,
                         help = 'number of top k class presented in the output')
     parser.add_argument('--category_names',action = 'store', dest = 'category_names', type = str, default = './cat_to_name.json',
                         help = 'mapping of the category name')
@@ -36,33 +37,30 @@ def init_argparse():
     args = parser.parse_args()
     return args
 
-with open(category_names, 'r') as f:
-    cat_to_name = json.load(f)
-
-device = torch.device('cuda' if (torch.cuda.is_available() == True) & (in_args.gpu == True) else 'cpu' )
-
-# # TODO: Write a function that loads a checkpoint and rebuilds the model
+# TODO: Write a function that loads a checkpoint and rebuilds the model
 # def load_checkpoint(filepath, arch):
 #     checkpoint = torch.load(filepath)
 #     ### initialize model and optimizer
 #     model = getattr(models, arch)(pretrained = True)
 #     model.classifier = checkpoint['classifier']
 #     model.load_state_dict(checkpoint['state_dict'])
-#
+
 #     optimizer = optim.Adam(model.classifier.parameters(), lr = 0.003)
 #     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 #     epochs = checkpoint['epochs']
-#
+
 #     return model
 
 def load_model(checkpoint):
-
+    
+    checkpoint = torch.load(checkpoint)
+    print(checkpoint['arch'])
     t_models = {
                 'vgg19' : models.vgg19(pretrained = True),
                 'densenet121' : models.densenet121(pretrained = True),
                 'resnet101' : models.resnet101(pretrained = True)}
 
-    model = t_models.get(checkpoint['arch'], 'vgg19')
+    model = t_models.get(checkpoint['arch'], models.vgg19(pretrained = True))
 
     if checkpoint['arch'] == 'vgg19' or checkpoint['arch'] == 'densenet121':
         model.classifer = checkpoint['classifier']
@@ -101,8 +99,14 @@ def main():
     start_time = time.time()
     ### input argument
     in_args = init_argparse()
-    print(in_args)
-    nn_model = load_model(checkpoint)
+    
+    
+    with open(in_args.category_names, 'r') as f:
+        cat_to_name = json.load(f)
+    
+    device = torch.device('cuda' if (torch.cuda.is_available() == True) & (in_args.gpu == True) else 'cpu' )
+    
+    nn_model = load_model(in_args.checkpoint)
     nn_model.eval()
 
     top_p, top_class = predict(image_direction, nn_model, topk)
@@ -120,5 +124,5 @@ def main():
 # plt.show()
 # imshow(img_path)
 
-if __name__ = '__main__':
+if __name__ == '__main__':
     main()

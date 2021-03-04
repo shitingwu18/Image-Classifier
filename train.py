@@ -8,6 +8,7 @@
 
 # Imports here
 import os
+os.environ['QT_QPA_PLATFORM']='offscreen'
 import torchvision
 import torch
 import torchvision.models as models
@@ -24,13 +25,13 @@ import matplotlib.pyplot as plt
 def init_argparse():
     parser = argparse.ArgumentParser(description = 'add argument to train model')
     # Argument : Data directory
-    parser.add_argument('data_dir', action = 'store', type = str, ### default = './flowers',
+    parser.add_argument('--data_dir', action = 'store', dest = 'data_dir', type = str, ### default = './flowers',
                     help = 'data directory of the model')
     ### # Argument : Choose architecture
-    parser.add_argument('--arch', action = 'store', dest = 'arch', type = str, default = 'vgg16_bn')
+    parser.add_argument('--arch', action = 'store', dest = 'arch', type = str, default = 'vgg19')
     # Argument : Set directory to save checkpoints
 
-    parser.add_argument('--save_dir', action = 'store',dest = 'save_dir', type = str, default = './checkpoint.pth',
+    parser.add_argument('--save_dir', action = 'store',dest = 'save_dir', type = str,
                         help = 'path to save checkpoint')
     # Argument : Set hyperparameters
     parser.add_argument('--learning_rate', action = 'store',dest = 'learning_rate', type = float, default = 0.003)
@@ -38,18 +39,19 @@ def init_argparse():
     parser.add_argument('--epochs', action = 'store', dest = 'epochs', type = int, default = 45)
     # Argument : User GPU for training
     parser.add_argument('--gpu',action = 'store_true', dest = 'gpu', default = True)
+#     parser.add_argument('--loss', action = 'store', dest = 'loss', default = 'MSE')
     parser.add_argument('--barch_size', action = 'store', dest = 'batch_size', default = 64)
     args = parser.parse_args()
 
     ### adding help message
     if(args.arch == 'help'):
         print('List of available CNN networks:')
-        print('1. vgg11')
-        print('2. vgg13')
-        print('3. vgg16')
-        print('4. vgg16_bn')
-        print('5. desenet121')
-        print('6. alexnet')
+#         print('1. vgg11')
+#         print('2. vgg13')
+        print('1. vgg19')
+#         print('4. vgg16_bn')
+        print('2. desenet121')
+        print('3. alexnet')
         quit()
 
     if(args.learning_rate > 1 or args.learning_rate < 0):
@@ -66,23 +68,23 @@ def init_argparse():
         print('Error: Invalid number of hidden units given, Must be greater than 0')
         quit()
 
-    arches = ['vgg11', 'vgg13', 'vgg16', 'vgg19', 'alexnet', 'densenet']
-    lossF = ['L1', 'NLL', 'Poisson', 'MSE', 'Cross']
+    arches = ['vgg19', 'alexnet', 'densenet'] ###'vgg11', 'vgg13', 'vgg16', ]
+#     lossF = ['L1', 'NLL', 'Poisson', 'MSE', 'Cross']
 
     if args.arch not in arches:
         print('Error: Invalid architecture naume received')
         print('Type \'python train.py -a help\' for more information')
         quit()
 
-    if args.loss not in lossF:
-        print('Error: Invalid architecture name received')
-        print('type \'python train.py -l help\' for more information ')
-        quit()
+#     if args.loss not in lossF:
+#         print('Error: Invalid architecture name received')
+#         print('type \'python train.py -l help\' for more information ')
+#         quit()
 
-    if args.device not in ['cpu', 'gpu']:
-        print('Error: invalid device name received')
-        print('It must be either 'cpu' or 'gpu')
-        quit()
+#     if args.device not in ['cpu', 'gpu']:
+#         print('Error: invalid device name received')
+#         print('It must be either \'cpu\' or \'gpu\'')
+#         quit()
 
     return args
     ### Assign variable in_args to parse_args()
@@ -92,7 +94,7 @@ def loaders(data_dir, batch_size, transform):
     datasets = torchvision.datasets.ImageFolder(root = data_dir, transform = transform)
     dataloaders = DataLoader(datasets, batch_size = batch_size, shuffle = True)
 
-    retrun dataloaders
+    return datasets, dataloaders
 
 def create_checkpoint(model, path, model_name, class_to_idx, optimizer, epochs):
     model.cpu()
@@ -141,9 +143,9 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
 
 
     # TODO: Using the image datasets and the trainforms, define the dataloaders
-    trainloaders = loaders(train_dir,batch_size=batch_size,transform = train_transform)
-    validloaders = loaders(valid_dir,batch_size=batch_size,transform = test_transform)
-    testloaders = loaders(test_dir,batch_size=batch_size,transform=test_transform)
+    train_datasets, trainloaders = loaders(train_dir,batch_size=batch_size,transform = train_transform)
+    _ , validloaders = loaders(valid_dir,batch_size=batch_size,transform = test_transform)
+    _ , testloaders = loaders(test_dir,batch_size=batch_size,transform=test_transform)
 
 
     # ### Define model
@@ -175,32 +177,33 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
                 'resnet101': models.resnet101(pretrained = True)
     }
 
-    model = t_models.get(model_name, 'vgg19')
+    model = t_models.get(arch, models.vgg19(pretrained = True))
+    print(model)
     classifier = None
     optimizer = None
 
-    if model_name == 'vgg19':
+    if arch == 'vgg19':
         classifier = nn.Sequential(nn.Linear(25088, 4096),
                                 nn.ReLU(),
-                                nn.Dropoutput(0.4),
+                                nn.Dropout(0.4),
                                 nn.Linear(4096,102),
                                 nn.LogSoftmax(dim=1))
         model.classifier = classifier
         optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
 
-    if model_name == 'densenet121':
+    if arch == 'densenet121':
         classifier = nn.Sequential(nn.Linear(1024, 1000),
                                 nn.ReLU(),
-                                nn.Dropoutput(0.4),
+                                nn.Dropout(0.4),
                                 nn.Linear(1000,102),
                                 nn.LogSoftmax(dim=1))
         model.classifier = classifier
         optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
 
-    if model_name == 'resnet101':
+    if arch == 'resnet101':
         classifier = nn.Sequential(nn.Linear(2048, 1000),
                                 nn.ReLU(),
-                                nn.Dropoutput(0.4),
+                                nn.Dropout(0.4),
                                 nn.Linear(1000,102),
                                 nn.LogSoftmax(dim=1))
         model.fc = classifier
@@ -212,7 +215,7 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
     device = torch.device("cuda" if (torch.cuda.is_available() == True) & (gpu == True) else "cpu")
     print(device)
     ### Train model
-    vgg.to(device)
+    model.to(device)
     every_batch =5
     iteration = 0
 
@@ -233,7 +236,7 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
             print('data to device')
             optimizer.zero_grad()
 
-            log_ps = vgg.forward(images)
+            log_ps = model.forward(images)
             print('finish feed forwrad')
             loss = criterion(log_ps, labels)
 
@@ -247,14 +250,14 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
             equals = top_class == labels.view(*top_class.shape)
             accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
 
-        vgg.eval()
+        model.eval()
         with torch.no_grad():
             print('start validation')
             valid_running_loss = 0
             valid_accuracy = 0
             for valid_images,valid_labels in validloaders:
                 valid_images, valid_labels = valid_images.to(device), valid_labels.to(device)
-                valid_log_ps = vgg.forward(valid_images)
+                valid_log_ps = model.forward(valid_images)
                 valid_loss = criterion(valid_log_ps, valid_labels)
                 valid_running_loss += valid_loss.item()
 
@@ -263,7 +266,7 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
                 #         print(top_class)
                 valid_equals = valid_top_class == valid_labels.view(*valid_top_class.shape)
                 valid_accuracy += torch.mean(valid_equals.type(torch.FloatTensor)).item()
-        vgg.train()
+        model.train()
 
 
         print('epoch: ', i + 1)
@@ -275,26 +278,28 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
         print('valid loss of this epoch: ', validation_loss[i])
         validation_accuracy.append(valid_accuracy/len(validloaders))
         print('accuracy of the valid set: ', validation_accuracy[i])
+        
+    fig1 = plt.figure(figsize = (10,6))
+    print('train_loss', train_loss)
+    plt.plot(train_loss, label = 'Training')
+    plt.plot(validation_loss, label = 'Validation')
+    plt.legend()
+    plt.xlabel('epoch')
+    plt.ylabel('Loss')
+    plt.title('Training vs Validation Loss')
+    fig1.savefig(os.path.join(os.getcwd(),'loss.png'))
 
-        plt.figure(figsize = (10,6))
-        plt.plot(train_loss, label = 'Training')
-        plt.plot(validation_loss, label = 'Validation')
-        plt.legend()
-        plt.xlabel('epoch')
-        plt.ylabel('Loss')
-        plt.title('Training vs Validation Loss')
-        plt.show()
+    fig2 = plt.figure(figsize = (10,6))
+    print('train_accuracy', train_accuracy)
+    plt.plot(train_accuracy, label = 'Training')
+    plt.plot(validation_accuracy, label = 'Validation')
+    plt.legend()
+    plt.xlabel('epoch')
+    plt.ylabel('Acurracy')
+    plt.title('Training vs Validation Accuracy')
+    fig2.savefig(os.path.join(os.getcwd(),'accuracy.png'))
 
-        plt.figure(figsize = (10,6))
-        plt.plot(train_accuracy, label = 'Training')
-        plt.plot(validation_accuracy, label = 'Validation')
-        plt.legend()
-        plt.xlabel('epoch')
-        plt.ylabel('Acurracy')
-        plt.title('Training vs Validation Accuracy')
-        plt.show()
-
-    create_checkpoint(vgg, save_dir, arch, train_datasets.class_to_idx, optimizer, epochs):
+    create_checkpoint(model, save_dir, arch, train_datasets.class_to_idx, optimizer, epochs)
 
 
 def main():
@@ -303,7 +308,7 @@ def main():
     in_args = init_argparse()
     print(in_args)
 
-    train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, batch_size, arch)
+    train_model(in_args.data_dir, in_args.save_dir, in_args.learning_rate, in_args.hidden_units, in_args.epochs, in_args.gpu, in_args.batch_size, in_args.arch)
         # TODO 0: Measure total program runtime by collecting end time
     end_time = time.time()
 
