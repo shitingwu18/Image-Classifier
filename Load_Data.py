@@ -11,7 +11,23 @@ def process_image(image):
     
     # TODO: Process a PIL image for use in a PyTorch model
     im = Image.open(image)
-    im.thumbnail((256,256))
+    
+    width, height = im.size
+    
+    aspect_ratio = width / height
+    if width < height:
+        new_width = 256
+        new_height = int(new_width / aspect_ratio)
+    elif height < width:
+        new_height = 256
+        new_width = int(width * aspect_ratio)
+    else: # when both sides are equal
+        new_width = 256
+        new_height = 256
+    im = im.resize((new_width, new_height))
+    
+#     im.thumbnail((256,256))
+    
     
     im = im.crop((0,0,224,224))
 #     print(im)
