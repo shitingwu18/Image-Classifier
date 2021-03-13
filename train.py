@@ -28,31 +28,22 @@ def init_argparse():
     parser.add_argument('--data_dir', action = 'store', dest = 'data_dir', type = str, ### default = './flowers',
                     help = 'data directory of the model')
     ### # Argument : Choose architecture
-    parser.add_argument('--arch', action = 'store', dest = 'arch', type = str, default = 'vgg19')
+    parser.add_argument('--arch', action = 'store', dest = 'arch', type = str, choices = ['vgg19', 'resnet101', 'densenet121']
+                        , default = 'vgg19',help='Choose from "vgg19", "densenet121" or "resnet101"'
+                       )
     # Argument : Set directory to save checkpoints
 
     parser.add_argument('--save_dir', action = 'store',dest = 'save_dir', type = str,
                         help = 'path to save checkpoint')
     # Argument : Set hyperparameters
     parser.add_argument('--learning_rate', action = 'store',dest = 'learning_rate', type = float, default = 0.003)
-    parser.add_argument('--hidden_units', action = 'append',dest = 'hidden_units', type = int, default = 1024)
+    parser.add_argument('--hidden_units', dest = 'hidden_units', type = int, default = 1024)
     parser.add_argument('--epochs', action = 'store', dest = 'epochs', type = int, default = 45)
     # Argument : User GPU for training
-    parser.add_argument('--gpu',action = 'store_true', dest = 'gpu', default = True)
+    parser.add_argument('--gpu',action = 'store_true', dest = 'gpu', default = False)
 #     parser.add_argument('--loss', action = 'store', dest = 'loss', default = 'MSE')
     parser.add_argument('--barch_size', action = 'store', dest = 'batch_size', default = 64)
     args = parser.parse_args()
-
-    ### adding help message
-    if(args.arch == 'help'):
-        print('List of available CNN networks:')
-#         print('1. vgg11')
-#         print('2. vgg13')
-        print('1. vgg19')
-#         print('4. vgg16_bn')
-        print('2. desenet121')
-        print('3. alexnet')
-        quit()
 
     if(args.learning_rate > 1 or args.learning_rate < 0):
         print('Error: Invalid learning rate')
@@ -68,7 +59,7 @@ def init_argparse():
         print('Error: Invalid number of hidden units given, Must be greater than 0')
         quit()
 
-    arches = ['vgg19', 'alexnet', 'densenet'] ###'vgg11', 'vgg13', 'vgg16', ]
+        
 #     lossF = ['L1', 'NLL', 'Poisson', 'MSE', 'Cross']
 
     if args.arch not in arches:
@@ -181,33 +172,35 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
     print(model)
     classifier = None
     optimizer = None
-
+    
+    output_layer = len(train_datasets.class_to_idx)
+    
     if arch == 'vgg19':
-        classifier = nn.Sequential(nn.Linear(25088, 4096),
+        classifier = nn.Sequential(nn.Linear(25088, hidden_units),
                                 nn.ReLU(),
                                 nn.Dropout(0.4),
-                                nn.Linear(4096,102),
+                                nn.Linear(hidden_units,output_layer),
                                 nn.LogSoftmax(dim=1))
         model.classifier = classifier
         optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
 
-    if arch == 'densenet121':
-        classifier = nn.Sequential(nn.Linear(1024, 1000),
+    elif arch == 'densenet121':
+        classifier = nn.Sequential(nn.Linear(1024, hidden_units),
                                 nn.ReLU(),
                                 nn.Dropout(0.4),
-                                nn.Linear(1000,102),
+                                nn.Linear(hidden_units,output_layer),
                                 nn.LogSoftmax(dim=1))
         model.classifier = classifier
         optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
 
-    if arch == 'resnet101':
-        classifier = nn.Sequential(nn.Linear(2048, 1000),
+    elif arch == 'resnet101':
+        classifier = nn.Sequential(nn.Linear(2048, hidden_units),
                                 nn.ReLU(),
                                 nn.Dropout(0.4),
-                                nn.Linear(1000,102),
+                                nn.Linear(hidden_units,output_layer),
                                 nn.LogSoftmax(dim=1))
         model.fc = classifier
-        optimizer = optim.Adam(model.classifier.parameters(), lr = learning_rate)
+        optimizer = optim.Adam(model.fc.parameters(), lr = learning_rate)
 
 
     criterion = nn.NLLLoss()
@@ -233,16 +226,13 @@ def train_model(data_dir, save_dir, learning_rate, hidden_units, epochs, gpu, ba
             images, labels = images.to(device), labels.to(device)
 
             iteration += 1
-            print('data to device')
             optimizer.zero_grad()
 
             log_ps = model.forward(images)
-            print('finish feed forwrad')
             loss = criterion(log_ps, labels)
 
             loss.backward()
             optimizer.step()
-            print('finish back propagation')
             running_loss += loss.item()
 
             ps = torch.exp(log_ps)

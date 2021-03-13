@@ -23,14 +23,13 @@ def init_argparse():
     parser.add_argument('--image_direction', type = str,
                         help = 'input image file directory')
     ### # Argument : Choose architecture
-    parser.add_argument('--arch', action = 'store', dest = 'arch', type = str, default = 'vgg16_bn')
     parser.add_argument('--checkpoint',action ='store', dest = 'checkpoint', type = str,
                         help = 'pretrained model file')
     parser.add_argument('--topk',action = 'store', dest = 'topk', type = int, default = 3,
                         help = 'number of top k class presented in the output')
     parser.add_argument('--category_names',action = 'store', dest = 'category_names', type = str, default = './cat_to_name.json',
                         help = 'mapping of the category name')
-    parser.add_argument('--gpu', action = 'store_true',dest = 'gpu', default = True,
+    parser.add_argument('--gpu', action = 'store_true',dest = 'gpu', default = False,
                         help = '')
     # img_path = './flowers/train/43/image_02338.jpg'
 
@@ -110,6 +109,7 @@ def main():
     nn_model.eval()
 
     top_p, top_class = predict(image_direction, nn_model, topk)
+    #### this is the code that convert indice to acutal class -- cat_to_name[str(i)]
     print('top class: ', [cat_to_name[str(i)] for i in top_class.tolist()[0]])
     print('top possibility: ', top_p.tolist()[0])
 
